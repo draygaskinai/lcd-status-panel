@@ -10,6 +10,11 @@ can write a status file.
 
 **Windows only.**
 
+**[⬇ Download the latest release](https://github.com/draygaskinai/lcd-status-panel/releases/latest)**
+— built automatically by GitHub Actions from the source in this repo, with a
+published SHA-256 hash. See **Is this safe to run?** below if you want to
+verify that yourself before trusting it.
+
 ---
 
 ## Will it work with my panel?
