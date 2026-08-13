@@ -1,0 +1,71 @@
+name: Build Release
+
+# Runs the exact same build.ps1 a person would run locally (see README >
+# Building it yourself). Nothing here is a hand-assembled artifact - what a
+# tag produces is what this file says it produces.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: # lets you trigger a build manually, without a tag, to test the pipeline
+
+permissions:
+  contents: write # needed to attach the zip to a Release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Create venv and install dependencies
+        run: |
+          python -m venv venv
+          venv\Scripts\pip install --upgrade pip
+          venv\Scripts\pip install -r requirements.txt
+
+      - name: Build
+        run: .\build.ps1
+
+      - name: Compute SHA-256
+        id: hash
+        run: |
+          $hash = (Get-FileHash dist\LcdPanel.zip -Algorithm SHA256).Hash
+          "sha256=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Output "SHA-256: $hash"
+
+      # Uploaded on every run (including workflow_dispatch, without a tag) so
+      # the pipeline itself can be test-run without cutting a release.
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LcdPanel
+          path: dist\LcdPanel.zip
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HASH: ${{ steps.hash.outputs.sha256 }}
+        run: |
+          @"
+          SHA-256 of LcdPanel.zip:
+
+              $($env:HASH)
+
+          Built automatically from this tag by GitHub Actions, from the
+          source in this repository - nothing here is assembled by hand.
+          See .github/workflows/release.yml for the exact build steps.
+          "@ | Out-File -FilePath release-notes.txt -Encoding utf8
+
+          gh release create "${{ github.ref_name }}" dist\LcdPanel.zip `
+            --title "${{ github.ref_name }}" `
+            --notes-file release-notes.txt
