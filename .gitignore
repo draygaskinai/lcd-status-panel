@@ -1,0 +1,13 @@
+# Local environment / build artifacts - not part of the source release.
+venv/
+build/
+dist/
+__pycache__/
+*.pyc
+
+# Runtime logs.
+*.log
+
+# Personal config - contains whoever's own dictation-file path.
+# The template everyone gets is config.dist.ini, tracked separately.
+config.ini

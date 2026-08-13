@@ -1,0 +1,20 @@
+# Only what status_panel.py actually imports - not the upstream project's
+# full theme-editor/multi-app requirements list, which pulls in a Tk GUI
+# toolkit and several packages this script never touches.
+
+pyserial~=3.5              # talks to the panel over its serial protocol
+pillow~=12.3.0              # renders the frame
+numpy~=2.5.2                # library/lcd/serialize.py's RGB565 conversion
+psutil~=7.2.2                 # CPU%/RAM%
+pycaw~=20251023                # microphone mute state + active device name
+comtypes~=1.4.16               # COM plumbing pycaw depends on
+pythonnet~=3.1.0                # loads LibreHardwareMonitorLib.dll for CPU temp
+pywin32>=312                     # used by the LibreHardwareMonitor integration
+
+# Nvidia only - GPU%/GPU temp/VRAM read N/A without an Nvidia card.
+# mathoudebine's fork instead of the original PyPI package: the original is
+# broken on Python 3.12+ and unmaintained.
+GPUtil @ git+https://github.com/mathoudebine/gputil.git@784499d443d38ed8c591fd27ae76b0a91dbcf788
+
+# Only needed to build the .exe yourself - see README > Building it yourself.
+pyinstaller~=6.22.0
