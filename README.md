@@ -57,7 +57,14 @@ reliably.
 ### 2. Run it
 
 Unzip anywhere and double-click **`LcdPanel.exe`**. The panel should light up
-within a few seconds.
+within a few seconds, and a tray icon appears in the notification area —
+that icon *is* the app; there's no window to keep open. Right-click it for:
+
+- **Open Config...** — opens `config.ini` in your default text editor
+- **Reload Config** — applies an edited `config.ini` immediately, no restart
+- **Restart Panel** — fully relaunches the process (use this if the panel
+  ever seems stuck or the connection to it gets into a bad state)
+- **Exit** — stops the panel and turns the display off
 
 To start it automatically at every login, run this once (it will ask for
 administrator rights, which is what lets it read CPU temperature):
@@ -154,7 +161,9 @@ driver is missing.)
 
 ## Configuration
 
-Edit **`config.ini`** next to the .exe in any text editor, then restart the app.
+Edit **`config.ini`** next to the .exe in any text editor, then either pick
+**Reload Config** from the tray icon or restart the app. The tray's
+**Open Config...** item opens the file for you.
 
 ### Orientation
 
@@ -174,6 +183,22 @@ brightness = 80
 ```
 
 `0`–`100`.
+
+### Mic panel
+
+The "active mic" region — the full top band normally, or the right half /
+second band once dictation (below) is on — can show one of two things,
+settable from the tray's **Settings...** window, or by hand:
+
+```ini
+mic_panel = mic
+```
+
+- `mic` — microphone mute state and active input device (default)
+- `datetime` — the current time and date
+
+This is independent of the dictation block below: turning dictation on adds
+it alongside whichever mic panel you've picked, it doesn't replace it.
 
 ### Colour thresholds
 
@@ -197,7 +222,7 @@ lot between cards).
 
 Most people should leave this blank. If you run a speech-to-text tool that can
 write a small JSON status file, point at it and the panel gains a dictation
-block:
+block next to the mic panel above:
 
 ```ini
 [dictation]
@@ -236,6 +261,13 @@ pair).
 
 **It stopped after a Windows update / reboot.**
 Re-run `LcdPanel.exe --install-autostart`.
+
+**The panel froze / stopped updating.**
+Nothing is driving it - the display just holds its last frame forever if the
+process behind it isn't running. Check the tray icon: if it's gone, the
+process died (Task Manager → look for `LcdPanel.exe`, or re-run
+`--install-autostart`). If the tray icon is there but the panel looks stale,
+try **Restart Panel** from its menu.
 
 ---
 

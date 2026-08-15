@@ -51,8 +51,10 @@ a = Analysis(
     hookspath=[os.path.join('venv', 'Lib', 'site-packages', 'pythonnet', '_pyinstaller')],
     hooksconfig={},
     runtime_hooks=[],
-    # No Tk anywhere in this app; excluding it saves ~10MB in the bundle.
-    excludes=['tkinter', 'matplotlib', 'numpy.testing', 'pytest'],
+    # tkinter drives the Settings window (status_panel.py's
+    # _build_settings_window) - it used to be excluded here to save ~10MB
+    # when the app had no GUI beyond the panel itself.
+    excludes=['matplotlib', 'numpy.testing', 'pytest'],
     noarchive=False,
     optimize=0,
 )
@@ -69,8 +71,10 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    # console=True so --install-autostart and the PawnIO hint are readable.
-    # The panel itself is launched windowless by Task Scheduler regardless.
+    # console=True so --install-autostart and the PawnIO hint are readable
+    # when run from a terminal. The normal run path hides its own console
+    # window at startup (status_panel.py: hide_console_window()) and lives
+    # in the tray instead - console=True only affects the CLI-flag paths.
     console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
