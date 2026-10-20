@@ -80,6 +80,7 @@ MIC_PANEL_LABELS = {
 _DEFAULTS = {
     "display": {"orientation": "landscape", "brightness": "80", "mic_panel": "mic"},
     "dictation": {"status_file": ""},
+    "export": {"cpu_temp_file": ""},
     "thresholds": {
         "cpu_warn": "50", "cpu_bad": "80",
         "cpu_temp_warn": "75", "cpu_temp_bad": "85",
@@ -103,8 +104,9 @@ def _load_display_settings():
     import time and again by the tray's Reload Config, so anything that
     should pick up an edited config.ini without a restart has to be read
     from these globals at use time, not cached elsewhere."""
-    global CONFIG, ORIENTATION, BRIGHTNESS, DICTATE_STATUS_FILE, SHOW_DICTATION, MIC_PANEL
+    global CONFIG, ORIENTATION, BRIGHTNESS, DICTATE_STATUS_FILE, SHOW_DICTATION, MIC_PANEL, CPU_TEMP_FILE
     CONFIG = load_config()
+    CPU_TEMP_FILE = CONFIG["export"]["cpu_temp_file"].strip()
     ORIENTATION = ORIENTATIONS.get(
         CONFIG["display"]["orientation"].strip().lower(), Orientation.LANDSCAPE
     )
@@ -116,8 +118,29 @@ def _load_display_settings():
     MIC_PANEL = mic_panel if mic_panel in MIC_PANELS else "mic"
 
 
-CONFIG = ORIENTATION = BRIGHTNESS = DICTATE_STATUS_FILE = SHOW_DICTATION = MIC_PANEL = None
+CONFIG = ORIENTATION = BRIGHTNESS = DICTATE_STATUS_FILE = SHOW_DICTATION = MIC_PANEL = CPU_TEMP_FILE = None
 _load_display_settings()
+
+
+# CPU temp needs this process's elevation (see LibreHardwareMonitor below), so
+# other non-elevated tools (the TV Home Dashboard) can't read it themselves.
+# Optionally share it as {"cpu_temp": float, "at": iso8601}, atomically and at
+# most every 2s rather than every 0.5s poll.
+_cpu_temp_written_at = 0.0
+
+
+def export_cpu_temp(cpu_temp):
+    global _cpu_temp_written_at
+    if not CPU_TEMP_FILE or cpu_temp is None or time.monotonic() - _cpu_temp_written_at < 2:
+        return
+    _cpu_temp_written_at = time.monotonic()
+    try:
+        tmp = CPU_TEMP_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"cpu_temp": round(cpu_temp, 1), "at": datetime.now().astimezone().isoformat()}, f)
+        os.replace(tmp, CPU_TEMP_FILE)
+    except OSError:
+        pass
 
 
 def threshold(name):
@@ -736,6 +759,7 @@ def panel_loop():
             mic_muted = read_mic_muted()
             device_name = read_input_device_name()
             stats = read_system_stats()
+            export_cpu_temp(stats[1])
             # Minute-granularity clock tick: nothing else in this key changes on
             # its own, so without this the clock could visibly stall on a poll
             # where every stat happens to read identical to the last one.
