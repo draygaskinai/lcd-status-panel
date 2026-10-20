@@ -839,26 +839,52 @@ _settings_open = False
 
 def save_config_values(values):
     """values: {(section, key): str}. In-place line edit rather than a full
-    rewrite - see module note above for why. Only replaces lines that already
-    exist in the file; it does not insert missing keys. Any new Settings
-    field needs its "key =" line added to config.dist.ini (and any already-
-    deployed config.ini) at the same time, or saving it here will silently
-    no-op on a config.ini that predates that field."""
+    rewrite - see module note above for why. Existing "key =" lines are
+    replaced in place. Any (section, key) with no existing line is appended
+    to the end of its section instead (the section itself is created at the
+    end of the file if it's missing too) - so a config.ini that predates a
+    Settings field just gets the key added on next save, rather than the
+    save silently no-opping for it."""
     path = os.path.join(APP_DIR, "config.ini")
     with open(path, encoding="utf-8") as f:
         lines = f.readlines()
 
+    remaining = dict(values)
     section = None
+    section_header_at = {}
     for i, line in enumerate(lines):
         m = _INI_SECTION_RE.match(line)
         if m:
             section = m.group(1).strip().lower()
+            section_header_at[section] = i
             continue
         m = _INI_KEY_RE.match(line)
         if m and section is not None:
             key = m.group(2).strip().lower()
-            if (section, key) in values:
-                lines[i] = f"{m.group(1)}{m.group(2)}{m.group(3)}{values[(section, key)]}\n"
+            if (section, key) in remaining:
+                lines[i] = f"{m.group(1)}{m.group(2)}{m.group(3)}{remaining.pop((section, key))}\n"
+
+    if remaining:
+        by_section = {}
+        for (section, key), value in remaining.items():
+            by_section.setdefault(section, []).append(f"{key} = {value}\n")
+
+        for section, new_lines in by_section.items():
+            if section in section_header_at:
+                insert_at = section_header_at[section] + 1
+                lines[insert_at:insert_at] = new_lines
+                # Shift the recorded position of every section that comes
+                # after this insertion, so later insertions in this same
+                # call still land right after their own header.
+                for other, pos in section_header_at.items():
+                    if pos > section_header_at[section]:
+                        section_header_at[other] = pos + len(new_lines)
+            else:
+                if lines and not lines[-1].endswith("\n"):
+                    lines[-1] += "\n"
+                lines.append(f"\n[{section}]\n")
+                lines.extend(new_lines)
+                section_header_at[section] = len(lines) - len(new_lines) - 1
 
     with open(path, "w", encoding="utf-8") as f:
         f.writelines(lines)
@@ -964,7 +990,9 @@ def _build_settings_window(icon):
     button_row = ttk.Frame(root)
     button_row.grid(row=3, column=0, sticky="e", **pad)
 
-    def _save():
+    def _apply():
+        """Validates and writes the form to config.ini. Returns True on
+        success, False if validation failed (nothing was saved)."""
         if dictation_enabled_var.get() and not status_file_var.get().strip():
             messagebox.showerror(
                 "Missing dictation status file",
@@ -972,7 +1000,7 @@ def _build_settings_window(icon):
                 "Either choose a file or uncheck it.",
                 parent=root,
             )
-            return
+            return False
 
         for name, label, _ in THRESHOLD_FIELDS:
             warn_var, bad_var = threshold_vars[name]
@@ -982,7 +1010,7 @@ def _build_settings_window(icon):
                     f"{label}: Warn ({warn_var.get():.0f}) can't be higher than Bad ({bad_var.get():.0f}).",
                     parent=root,
                 )
-                return
+                return False
 
         values = {
             ("display", "orientation"): orientation_var.get(),
@@ -999,10 +1027,15 @@ def _build_settings_window(icon):
         save_config_values(values)
         reload_config()
         _notify(icon, "Settings saved and applied.")
-        root.destroy()
+        return True
+
+    def _on_ok():
+        if _apply():
+            root.destroy()
 
     ttk.Button(button_row, text="Cancel", command=root.destroy).pack(side="right", padx=4)
-    ttk.Button(button_row, text="Save & Apply", command=_save).pack(side="right", padx=4)
+    ttk.Button(button_row, text="OK", command=_on_ok).pack(side="right", padx=4)
+    ttk.Button(button_row, text="Save & Apply", command=_apply).pack(side="right", padx=4)
 
     root.lift()
     root.attributes("-topmost", True)
